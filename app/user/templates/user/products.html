@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Products | TechEvents{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-card {
+        transition: all 0.3s ease;
+        height: 100%;
+    }
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+    }
+    .product-img-container {
+        height: 200px;
+        overflow: hidden;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+    }
+    .product-img {
+        max-height: 100%;
+        width: auto;
+        object-fit: contain;
+    }
+    .badge-custom {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="fas fa-store me-2"></i>Available Products
+        </h2>
+        <div>
+            <a href="{{ url_for('user.cart') }}" class="btn btn-outline-primary position-relative me-2">
+                <i class="fas fa-shopping-cart me-1"></i>Cart
+                {% if cart_count > 0 %}
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                    {{ cart_count }}
+                </span>
+                {% endif %}
+            </a>
+            <a href="{{ url_for('user.request_item') }}" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i>Request Item
+            </a>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <form class="d-flex" method="GET" action="{{ url_for('user.products') }}">
+                <input class="form-control me-2" type="search" name="q" placeholder="Search products..."
+                       value="{{ request.args.get('q', '') }}">
+                <button class="btn btn-outline-secondary" type="submit">
+                    <i class="fas fa-search"></i>
+                </button>
+            </form>
+        </div>
+        <div class="col-md-6">
+            <div class="dropdown float-end">
+                <button class="btn btn-outline-secondary dropdown-toggle" type="button"
+                        id="sortDropdown" data-bs-toggle="dropdown">
+                    Sort by: {{ sort_options.get(request.args.get('sort', 'newest'), 'Newest') }}
+                </button>
+                <ul class="dropdown-menu" aria-labelledby="sortDropdown">
+                    {% for value, label in sort_options.items() %}
+                    <li>
+                        <a class="dropdown-item {% if request.args.get('sort') == value %}active{% endif %}"
+                           href="{{ url_for('user.products', sort=value, q=request.args.get('q', '')) }}">
+                            {{ label }}
+                        </a>
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    {% if products %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        {% for product in products %}
+        <div class="col">
+            <div class="card product-card h-100 shadow-sm">
+                <div class="product-img-container p-3 position-relative">
+                    <img src="{{ url_for('static', filename='images/products/' + product.image) if product.image else url_for('static', filename='images/placeholder-product.png') }}"
+                         class="product-img card-img-top"
+                         alt="{{ product.name }}">
+                    {% if product.quantity <= 0 %}
+                    <span class="badge bg-danger badge-custom">Out of Stock</span>
+                    {% endif %}
+                </div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ product.name }}</h5>
+                    <p class="card-text text-muted">{{ product.description|truncate(100) }}</p>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0 text-primary">${{ "%.2f"|format(product.price) }}</h5>
+                        <span class="text-muted">
+                            <i class="fas fa-box-open me-1"></i>{{ product.quantity }} available
+                        </span>
+                    </div>
+                </div>
+                <div class="card-footer bg-white border-top-0">
+                    <div class="d-grid gap-2">
+                        {% if product.quantity > 0 %}
+                        <a href="{{ url_for('user.add_to_cart', product_id=product.id) }}"
+                           class="btn btn-primary">
+                            <i class="fas fa-cart-plus me-1"></i>Add to Cart
+                        </a>
+                        {% else %}
+                        <button class="btn btn-secondary" disabled>
+                            <i class="fas fa-times-circle me-1"></i>Out of Stock
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <nav class="mt-4" aria-label="Product pagination">
+        <ul class="pagination justify-content-center">
+            {% if pagination.has_prev %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('user.products', page=pagination.prev_num, sort=request.args.get('sort'), q=request.args.get('q')) }}">
+                    <i class="fas fa-angle-left"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link"><i class="fas fa-angle-left"></i></span>
+            </li>
+            {% endif %}
+
+            {% for page_num in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=3) %}
+                {% if page_num %}
+                    {% if page_num == pagination.page %}
+                    <li class="page-item active">
+                        <span class="page-link">{{ page_num }}</span>
+                    </li>
+                    {% else %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('user.products', page=page_num, sort=request.args.get('sort'), q=request.args.get('q')) }}">
+                            {{ page_num }}
+                        </a>
+                    </li>
+                    {% endif %}
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">...</span>
+                    </li>
+                {% endif %}
+            {% endfor %}
+
+            {% if pagination.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="{{ url_for('user.products', page=pagination.next_num, sort=request.args.get('sort'), q=request.args.get('q')) }}">
+                    <i class="fas fa-angle-right"></i>
+                </a>
+            </li>
+            {% else %}
+            <li class="page-item disabled">
+                <span class="page-link"><i class="fas fa-angle-right"></i></span>
+            </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% else %}
+    <div class="text-center py-5">
+        <i class="fas fa-box-open fa-4x text-muted mb-4"></i>
+        <h4 class="text-muted">No products found</h4>
+        <p class="text-muted">Try adjusting your search or filter criteria</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

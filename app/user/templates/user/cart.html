@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Your Cart | TechEvents{% endblock %}
+
+{% block extra_css %}
+<style>
+    .cart-item-img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+    }
+    .quantity-input {
+        width: 60px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle quantity changes
+    document.querySelectorAll('.quantity-btn').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const cartId = this.dataset.cartId;
+            const action = this.dataset.action;
+
+            updateCartItem(cartId, action);
+        });
+    });
+
+    // Handle remove item
+    document.querySelectorAll('.remove-item').forEach(btn => {
+        btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            const cartId = this.dataset.cartId;
+
+            if (confirm('Are you sure you want to remove this item?')) {
+                updateCartItem(cartId, 'remove');
+            }
+        });
+    });
+
+    // Handle manual quantity input
+    document.querySelectorAll('.quantity-input').forEach(input => {
+        input.addEventListener('change', function() {
+            const cartId = this.dataset.cartId;
+            const quantity = this.value;
+
+            if (quantity > 0) {
+                updateCartItem(cartId, 'set', quantity);
+            } else {
+                this.value = 1;
+            }
+        });
+    });
+
+    function updateCartItem(cartId, action, quantity = null) {
+        const formData = new FormData();
+        formData.append('action', action);
+        if (quantity) formData.append('quantity', quantity);
+
+        fetch(`/user/update-cart/${cartId}`, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Accept': 'application/json'
+            },
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update cart count in navbar
+                document.querySelectorAll('.cart-count').forEach(el => {
+                    el.textContent = data.cart_count;
+                });
+
+                // Reload the page if not AJAX
+                if (!data.redirect) {
+                    location.reload();
+                }
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    }
+});
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">
+            <i class="fas fa-shopping-cart me-2"></i>Your Shopping Cart
+        </h2>
+        <a href="{{ url_for('user.products') }}" class="btn btn-outline-primary">
+            <i class="fas fa-arrow-left me-1"></i>Continue Shopping
+        </a>
+    </div>
+
+    {% if not cart_items %}
+    <div class="text-center py-5">
+        <i class="fas fa-shopping-cart fa-4x text-muted mb-4"></i>
+        <h4 class="text-muted">Your cart is empty</h4>
+        <p class="text-muted">Start adding some products!</p>
+        <a href="{{ url_for('user.products') }}" class="btn btn-primary mt-3">
+            <i class="fas fa-store me-1"></i>Browse Products
+        </a>
+    </div>
+    {% else %}
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Price</th>
+                                    <th>Quantity</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in cart_items %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <img src="{{ url_for('static', filename='images/products/' + item.image) if item.image else url_for('static', filename='images/placeholder-product.png') }}"
+                                                 class="cart-item-img rounded me-3"
+                                                 alt="{{ item.name }}">
+                                            <div>
+                                                <h6 class="mb-0">{{ item.name }}</h6>
+                                                <small class="text-muted">SKU: {{ item.id }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>${{ "%.2f"|format(item.price) }}</td>
+                                    <td>
+                                        <div class="input-group" style="max-width: 120px;">
+                                            <button class="btn btn-outline-secondary quantity-btn"
+                                                    type="button"
+                                                    data-cart-id="{{ item.id }}"
+                                                    data-action="decrement">
+                                                <i class="fas fa-minus"></i>
+                                            </button>
+                                            <input type="number"
+                                                   class="form-control quantity-input"
+                                                   value="{{ item.quantity }}"
+                                                   min="1"
+                                                   data-cart-id="{{ item.id }}">
+                                            <button class="btn btn-outline-secondary quantity-btn"
+                                                    type="button"
+                                                    data-cart-id="{{ item.id }}"
+                                                    data-action="increment">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                    <td>${{ "%.2f"|format(item.price * item.quantity) }}</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-danger remove-item"
+                                                data-cart-id="{{ item.id }}">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">Order Summary</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <span>${{ "%.2f"|format(subtotal) }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tax (10%):</span>
+                        <span>${{ "%.2f"|format(tax) }}</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between fw-bold">
+                        <span>Total:</span>
+                        <span>${{ "%.2f"|format(total) }}</span>
+                    </div>
+                </div>
+                <div class="card-footer bg-white">
+                    <a href="{{ url_for('user.checkout') }}" class="btn btn-primary w-100 btn-lg">
+                        <i class="fas fa-credit-card me-2"></i>Proceed to Checkout
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
